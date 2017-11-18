@@ -2,14 +2,18 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/types.h>
 #include <netinet/in.h>
 #include <arpa/inet.h> // For using "inet_nota"
 
 #include <unistd.h>
 #include <fcntl.h>
 
+#include <dirent.h> // For visualize directories
 typedef int SOCKET;
 int PORT;
+
+void listDirTree(const char *name, int indent, char *buf, int recursive);
 
 int main(int argc, char *argv[]){
 
@@ -60,6 +64,36 @@ int main(int argc, char *argv[]){
         printf("Connected with Client!\n");
         printf("[TCP] Client IP addr : %s, PORT = %d\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
 
+        int read_size;
+        char recv_msg[1000];
+        char send_msg[1000];
+
+        while(1){
+            memset(&send_msg, 0, sizeof(send_msg));
+            memset(&recv_msg, 0, sizeof(recv_msg));
+
+            // Recv
+            read_size = recv(client_socket, recv_msg, 1000, 0);
+            if(read_size == -1){
+                printf("Receive Failed!\n");
+            }
+            else if(read_size == 0){
+                printf("Disconnected with Client\n");
+                break;
+            }
+
+            // Send
+            if(!strcmp(recv_msg, "list")){
+                listDirTree("./server_folder", 0, send_msg, 0);    
+               
+                if(send(client_socket, send_msg, strlen(send_msg), 0) == -1){
+                    printf("Return Message Error for List!\n");
+                    break;
+                }
+
+            }
+
+        }
 
         // Close Client
         close(client_socket);
@@ -69,4 +103,63 @@ int main(int argc, char *argv[]){
     close(server_socket);
 
 }
+
+
+// Make directory tree
+void listDirTree(const char *name, int indent, char *buf, int recursive){
+    DIR *dir;
+    struct dirent *entry;
+
+    if(!(dir = opendir(name))){
+        return;
+    }
+ 
+    // file/dir on current directory    
+    while((entry = readdir(dir)) != NULL){
+        if(entry->d_type == DT_DIR){
+            char path[1024];
+            memset(&path, 0, sizeof(path));
+
+            if(strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name,"..") == 0){
+                continue;
+            }
+            // make path
+            strcat(path, name);
+            strcat(path, "/");
+            strcat(path, entry->d_name);
+
+            printf("%s\n",path);
+ 
+            // buffer
+            if(recursive){ 
+                // indentation
+                for(int i=0; i<indent - 2; i++){
+                    strcat(buf, " ");
+                }
+                strcat(buf, "ㄴ");
+
+            }
+            strcat(buf, entry->d_name);
+            strcat(buf, "\n");
+            
+            // search recursively
+            listDirTree(path, indent + 2, buf, 1);
+        }
+        else{
+            // buffer
+            if(recursive){ 
+                // indentation
+                for(int i=0; i<indent - 2; i++){
+                    strcat(buf, " ");
+                }
+                strcat(buf, "ㄴ");
+            }
+
+            strcat(buf,entry->d_name);
+            strcat(buf, "\n");
+        }
+    }
+    closedir(dir);
+}
+
 

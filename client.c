@@ -19,6 +19,9 @@ int main(int argc, char *argv[]){
     struct sockaddr_in client_addr;
     int addrlen;
 
+    char send_msg[1000];
+    char recv_msg[1000];
+
     // TCP SOCKET
     client_socket = socket(PF_INET, SOCK_STREAM, 0);
     if(client_socket == -1){
@@ -44,7 +47,33 @@ int main(int argc, char *argv[]){
     }
     printf("connect complete!\n");
 
-    // File Transfer 
+    
+    while(1){
+        memset(&send_msg, 0, sizeof(send_msg));
+        memset(&recv_msg, 0, sizeof(recv_msg));
+
+        // Send
+        scanf("%s", send_msg);
+        if(send(client_socket, send_msg, strlen(send_msg), 0) == -1){
+            printf("Sending Message Error!\n");
+            return -1;
+        }
+
+        // List of file
+        if(!strcmp(send_msg, "list")){
+            if(recv(client_socket, recv_msg, 1000, 0) == -1){
+                printf("Receiving Message Error for List!\n");
+                break;
+            }
+            printf("%d\n",strlen(recv_msg));
+            printf("%s\n",recv_msg);
+        }
+
+
+
+
+        // File Transfer 
+    }
 
     close(client_socket);
 
