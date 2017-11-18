@@ -13,6 +13,8 @@ typedef int SOCKET;
 int PORT;
 char* IP = "127.0.0.1";
 
+int str2int(char* str);
+
 int main(int argc, char *argv[]){
     
     SOCKET client_socket;
@@ -45,37 +47,120 @@ int main(int argc, char *argv[]){
         close(client_socket);
         return -1;
     }
-    printf("connect complete!\n");
+    printf("connect complete!\n\n");
 
     
     while(1){
         memset(&send_msg, 0, sizeof(send_msg));
         memset(&recv_msg, 0, sizeof(recv_msg));
 
-        // Send
+        printf("              USAGE               \n");
+        printf("#1. List Server Directory : \"list\"\n");
+        printf("#2. File Transfer : \"file\"\n");
+        printf("#3. Quit : \"q\"\n");
+        printf("Input : ");
+
+        // Send type
         scanf("%s", send_msg);
-        if(send(client_socket, send_msg, strlen(send_msg), 0) == -1){
-            printf("Sending Message Error!\n");
-            return -1;
-        }
+
+        if(!strcmp(send_msg, "q")) break;
 
         // List of file
         if(!strcmp(send_msg, "list")){
+ 
+            // Send
+            if(send(client_socket, send_msg, strlen(send_msg), 0) == -1){
+                printf("Sending Message Error!\n");
+                return -1;
+            }
+
+            // Receive
             if(recv(client_socket, recv_msg, 1000, 0) == -1){
                 printf("Receiving Message Error for List!\n");
                 break;
             }
-            printf("%d\n",strlen(recv_msg));
+            printf("\n###  server_folder ###\n");
             printf("%s\n",recv_msg);
         }
 
-
-
-
         // File Transfer 
+        if(!strcmp(send_msg, "file")){
+            
+            char fileName[100]; 
+            memset(&fileName, 0, sizeof(fileName));
+            
+            printf("Input file name : ");
+            scanf("%s", fileName);
+            
+            strcat(send_msg, " ");
+            strcat(send_msg, fileName);
+            
+            // Send File Name
+            if(send(client_socket, send_msg, strlen(send_msg), 0) == -1){
+                printf("Sending Message Error!\n");
+                return -1;
+            }
+        
+            // Receive Message about whether file exists or not
+            if(recv(client_socket, recv_msg, 1000, 0) == -1){
+                printf("Receiving Message Error for List!\n");
+                break;
+            }
+            if(!strcmp(recv_msg, "NO_SUCH_FILE")){
+                printf("No Such File!\n");
+                continue;
+            }
+
+
+            
+            char fileName_[100] = "./client_folder/";
+            strcat(fileName_,fileName);
+
+            // File Receive
+            FILE *fd = fopen(fileName_, "wb");
+            int bufferNum, totalBufferNum;
+            long readByte, totalReadByte;
+            long fileSize;
+            
+            char buf[1024];
+
+            fileSize = str2int(recv_msg);
+            totalBufferNum = fileSize / 1024 + 1;
+            bufferNum = 0;
+            totalReadByte = 0;
+
+            memset(&recv_msg, 0, sizeof(recv_msg));
+
+            while(bufferNum != totalBufferNum){
+                readByte = recv(client_socket, buf, 1024, 0);
+                bufferNum++;
+                totalReadByte += readByte;
+                printf("In progress : %ld/%ld Byte(s) [%d%%]\n\n", totalReadByte, fileSize, (bufferNum*100/totalBufferNum));
+                fwrite(buf, sizeof(char), readByte, fd);
+
+                if(readByte == -1){
+                    printf("File Receive Error!\n");
+                    return -1;
+                }
+            }
+
+            fclose(fd);
+
+        }
     }
 
     close(client_socket);
 
     return 0;
 }
+
+int str2int(char* str)
+{
+    int ret;
+    while ((*str >= '0') && (*str <= '9')){
+        ret = (ret * 10) + ((*str) - '0');
+        str++;
+    }
+    return ret;
+}
+

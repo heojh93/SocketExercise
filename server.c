@@ -30,6 +30,11 @@ int main(int argc, char *argv[]){
         return -1;
     }
 
+    // Prevent Bind Error
+    int option = 1;          // SO_REUSEADDR option : TRUE
+    setsockopt( server_socket, SOL_SOCKET, SO_REUSEADDR, &option, sizeof(option) );
+
+
     // Set IP Addr & Port
     memset(&server_addr, 0, sizeof(server_addr));
     server_addr.sin_family = AF_INET;
@@ -90,7 +95,54 @@ int main(int argc, char *argv[]){
                     printf("Return Message Error for List!\n");
                     break;
                 }
+            }
+    
 
+            // File Send
+            if(!strncmp(recv_msg, "file", 4)){
+                char fileName[100] = "./server_folder/";
+
+                // Parse recv_msg
+                int len = strlen(fileName);
+                for(int i=5; recv_msg[i]!='\0' ; i++){
+                    fileName[len + i - 5] = recv_msg[i];
+                }
+                fileName[strlen(fileName)] = '\0';
+
+                printf("Requested File Name : %s\n",fileName);
+                
+                // File Open
+                FILE *fd;
+                int fileExist = 1;
+                fd = fopen(fileName, "rb");
+                if(!fd){
+                    printf("File doesn't Exist\n");
+                    strcpy(send_msg, "NO_SUCH_FILE");
+                    fileExist = 0;
+                }
+                else{
+                    char fileSize[20];
+                    fseek(fd, 0, SEEK_END);
+                    sprintf(fileSize, "%ld", ftell(fd));
+                    fseek(fd, 0, SEEK_SET);
+                    strcpy(send_msg, fileSize);
+                }
+            
+                // Notice client whether file exists
+                if(send(client_socket, send_msg, strlen(send_msg), 0) == -1){
+                    printf("Sending Message Error!\n");
+                    return -1;
+                }
+                if(!fileExist) continue;
+
+
+                int sendByte;
+                char buf[1024];
+                while((sendByte = fread(buf, sizeof(char), sizeof(buf), fd)) > 0){
+                    send(client_socket, buf, sendByte, 0);
+                }
+                
+                fclose(fd);
             }
 
         }
