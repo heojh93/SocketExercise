@@ -11,17 +11,21 @@
 
 #include <dirent.h> // For visualize directories
 typedef int SOCKET;
-int PORT;
 
 void listDirTree(const char *name, int indent, char *buf, int recursive);
+int str2int(char* str);
 
 int main(int argc, char *argv[]){
+
+
+    if(argc < 2){
+        printf("Usage : ./server [PORT]\n");
+        return 0;
+    }
 
     SOCKET server_socket, client_socket;
     struct sockaddr_in server_addr, client_addr;
     int addrlen;
-
-    PORT = 9000;
 
     // TCP socket
     server_socket = socket(PF_INET, SOCK_STREAM, 0);
@@ -38,7 +42,7 @@ int main(int argc, char *argv[]){
     // Set IP Addr & Port
     memset(&server_addr, 0, sizeof(server_addr));
     server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(PORT);
+    server_addr.sin_port = htons(str2int(argv[1]));
     server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
     // Bind
@@ -121,6 +125,7 @@ int main(int argc, char *argv[]){
                     fileExist = 0;
                 }
                 else{
+                    // Transfer file size using file offset
                     char fileSize[20];
                     fseek(fd, 0, SEEK_END);
                     sprintf(fileSize, "%ld", ftell(fd));
@@ -136,13 +141,24 @@ int main(int argc, char *argv[]){
                 if(!fileExist) continue;
 
 
+                // Send File Data to Buffer
                 int sendByte;
                 char buf[1024];
                 while((sendByte = fread(buf, sizeof(char), sizeof(buf), fd)) > 0){
                     send(client_socket, buf, sendByte, 0);
                 }
-                
+               
+                // File close 
                 fclose(fd);
+            }
+
+            // Receive Message if client got file correctly
+            if(recv(client_socket, recv_msg, 1000, 0) == -1){
+                printf("Receiving Message Error!\n");
+                return -1;
+            }
+            if(!strcmp(recv_msg,"THANK YOU!")){
+                printf("Got Thanks Message From Client ^-^\n");
             }
 
         }
@@ -214,4 +230,12 @@ void listDirTree(const char *name, int indent, char *buf, int recursive){
     closedir(dir);
 }
 
+int str2int(char *str){
 
+    int ret;
+    while((*str >= '0') && (*str <= '9')){
+        ret = (ret * 10) + ((*str) - '0');
+        str++;
+    }
+    return ret;
+}

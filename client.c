@@ -10,13 +10,17 @@
 #include <fcntl.h>
 
 typedef int SOCKET;
-int PORT;
 char* IP = "127.0.0.1";
 
 int str2int(char* str);
 
 int main(int argc, char *argv[]){
-    
+   
+    if(argc < 2){
+        printf("Usage : ./client [PORT]\n");
+        return 0;
+    }
+
     SOCKET client_socket;
     struct sockaddr_in client_addr;
     int addrlen;
@@ -31,13 +35,11 @@ int main(int argc, char *argv[]){
         return -1;
     }
 
-    PORT = 9000;
-    
 
     // SET IP Addr & Port
     memset(&client_addr, 0, sizeof(client_addr));
     client_addr.sin_family = AF_INET;
-    client_addr.sin_port = htons(PORT);
+    client_addr.sin_port = htons(str2int(argv[1]));
     client_addr.sin_addr.s_addr = inet_addr(IP);
  
 
@@ -116,7 +118,7 @@ int main(int argc, char *argv[]){
             char fileName_[100] = "./client_folder/";
             strcat(fileName_,fileName);
 
-            // File Receive
+            // File Open
             FILE *fd = fopen(fileName_, "wb");
             int bufferNum, totalBufferNum;
             long readByte, totalReadByte;
@@ -131,6 +133,7 @@ int main(int argc, char *argv[]){
 
             memset(&recv_msg, 0, sizeof(recv_msg));
 
+            // Read Buffer from Socket & Write to client file
             while(bufferNum != totalBufferNum){
                 readByte = recv(client_socket, buf, 1024, 0);
                 bufferNum++;
@@ -142,9 +145,16 @@ int main(int argc, char *argv[]){
                     printf("File Receive Error!\n");
                     return -1;
                 }
-            }
-
+            } 
             fclose(fd);
+           
+            // Fin message 
+            memset(&send_msg, 0, sizeof(send_msg));
+            strcpy(send_msg, "THANK YOU!");
+            if(send(client_socket, send_msg, strlen(send_msg), 0) == -1){
+                printf("Message Error for Thx!\n");
+                return -1;
+            }
 
         }
     }
