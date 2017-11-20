@@ -9,5 +9,5 @@
 - [ ] Connection within different IP Address
 - [ ] Multi-tasking Server using fork()
 - [ ] Multi-plexing Server using select()
-- [ ] Multi-thread Server
+- [x] Multi-thread Server
 

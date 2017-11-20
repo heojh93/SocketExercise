@@ -10,10 +10,14 @@
 #include <fcntl.h>
 
 #include <dirent.h> // For visualize directories
+#include <pthread.h> // For using Thread : To Connect with multi client
+
+
 typedef int SOCKET;
 
 void listDirTree(const char *name, int indent, char *buf, int recursive);
 int str2int(char* str);
+void *connection_handler(void *);
 
 int main(int argc, char *argv[]){
 
@@ -57,6 +61,7 @@ int main(int argc, char *argv[]){
         return -1;
     }
 
+    pthread_t tid;
 
     // Accept
     while(1){
@@ -70,106 +75,126 @@ int main(int argc, char *argv[]){
             printf("Accept Error!\n");
             return -1;
         }
+
         printf("Connected with Client!\n");
         printf("[TCP] Client IP addr : %s, PORT = %d\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
 
-        int read_size;
-        char recv_msg[1000];
-        char send_msg[1000];
 
-        while(1){
-            memset(&send_msg, 0, sizeof(send_msg));
-            memset(&recv_msg, 0, sizeof(recv_msg));
-
-            // Recv
-            read_size = recv(client_socket, recv_msg, 1000, 0);
-            if(read_size == -1){
-                printf("Receive Failed!\n");
-            }
-            else if(read_size == 0){
-                printf("Disconnected with Client\n");
-                break;
-            }
-
-            // Send
-            if(!strcmp(recv_msg, "list")){
-                listDirTree("./server_folder", 0, send_msg, 0);    
-               
-                if(send(client_socket, send_msg, strlen(send_msg), 0) == -1){
-                    printf("Return Message Error for List!\n");
-                    break;
-                }
-            }
-    
-
-            // File Send
-            if(!strncmp(recv_msg, "file", 4)){
-                char fileName[100] = "./server_folder/";
-
-                // Parse recv_msg
-                int len = strlen(fileName);
-                for(int i=5; recv_msg[i]!='\0' ; i++){
-                    fileName[len + i - 5] = recv_msg[i];
-                }
-                fileName[strlen(fileName)] = '\0';
-
-                printf("Requested File Name : %s\n",fileName);
-                
-                // File Open
-                FILE *fd;
-                int fileExist = 1;
-                fd = fopen(fileName, "rb");
-                if(!fd){
-                    printf("File doesn't Exist\n");
-                    strcpy(send_msg, "NO_SUCH_FILE");
-                    fileExist = 0;
-                }
-                else{
-                    // Transfer file size using file offset
-                    char fileSize[20];
-                    fseek(fd, 0, SEEK_END);
-                    sprintf(fileSize, "%ld", ftell(fd));
-                    fseek(fd, 0, SEEK_SET);
-                    strcpy(send_msg, fileSize);
-                }
-            
-                // Notice client whether file exists
-                if(send(client_socket, send_msg, strlen(send_msg), 0) == -1){
-                    printf("Sending Message Error!\n");
-                    return -1;
-                }
-                if(!fileExist) continue;
-
-
-                // Send File Data to Buffer
-                int sendByte;
-                char buf[1024];
-                while((sendByte = fread(buf, sizeof(char), sizeof(buf), fd)) > 0){
-                    send(client_socket, buf, sendByte, 0);
-                }
-               
-                // File close 
-                fclose(fd);
-            }
-
-            // Receive Message if client got file correctly
-            if(recv(client_socket, recv_msg, 1000, 0) == -1){
-                printf("Receiving Message Error!\n");
-                return -1;
-            }
-            if(!strcmp(recv_msg,"THANK YOU!")){
-                printf("Got Thanks Message From Client ^-^\n");
-            }
-
+        if( pthread_create( &tid, NULL, connection_handler, (void*) &client_socket) < 0){
+            perror("could not create thread");
+            return -1;
         }
 
-        // Close Client
-        close(client_socket);
     }
  
     // Close Server   
     close(server_socket);
 
+}
+
+
+void *connection_handler(void * socket){
+
+    int client_socket = *(int *)socket;
+
+    int read_size;
+    char recv_msg[1000];
+    char send_msg[1000];
+
+    while(1){
+        memset(&send_msg, 0, sizeof(send_msg));
+        memset(&recv_msg, 0, sizeof(recv_msg));
+
+        // Recv
+        read_size = recv(client_socket, recv_msg, 1000, 0);
+        if(read_size == -1){
+            printf("Receive Failed!\n");
+        }
+        else if(read_size == 0){
+            printf("Disconnected with Client\n");
+            break;
+        }
+
+        // Send
+        if(!strcmp(recv_msg, "list")){
+            printf("Send File List!\n");
+            listDirTree("./server_folder", 0, send_msg, 0);    
+               
+            if(send(client_socket, send_msg, strlen(send_msg), 0) == -1){
+                printf("Return Message Error for List!\n");
+                break;
+            }
+        }
+    
+
+        // File Send
+        if(!strncmp(recv_msg, "file", 4)){
+            char fileName[100] = "./server_folder/";
+
+            // Parse recv_msg
+            int len = strlen(fileName);
+            for(int i=5; recv_msg[i]!='\0' ; i++){
+                fileName[len + i - 5] = recv_msg[i];
+            }
+            fileName[strlen(fileName)] = '\0';
+
+            printf("Requested File Name : %s\n",fileName);
+                
+            // File Open
+            FILE *fd;
+            int fileExist = 1;
+            fd = fopen(fileName, "rb");
+            if(!fd){
+                printf("File doesn't Exist\n");
+                strcpy(send_msg, "NO_SUCH_FILE");
+                fileExist = 0;
+            }
+            else{
+                // Transfer file size using file offset
+                char fileSize[20];
+                fseek(fd, 0, SEEK_END);
+                sprintf(fileSize, "%ld", ftell(fd));
+                fseek(fd, 0, SEEK_SET);
+                strcpy(send_msg, fileSize);
+            }
+            
+            // Notice client whether file exists
+            if(send(client_socket, send_msg, strlen(send_msg), 0) == -1){
+                printf("Sending Message Error!\n");
+                exit(-1);
+            }
+            if(!fileExist) continue;
+
+            printf("Start to Send File!\n");
+
+            // Send File Data to Buffer
+            int sendByte;
+            char buf[1024];
+            while((sendByte = fread(buf, sizeof(char), sizeof(buf), fd)) > 0){
+                send(client_socket, buf, sendByte, 0);
+            }
+ 
+            // Receive Message if client got file correctly
+            if(recv(client_socket, recv_msg, 1000, 0) == -1){
+                printf("Receiving Message Error!\n");                
+                exit(-1);
+            }
+            if(!strcmp(recv_msg,"THANK YOU!")){
+                printf("Got Thanks Message From Client ^-^\n");
+            }
+           
+            // File close 
+            fclose(fd);
+        }
+    }
+
+    // Close Client
+    close(client_socket);
+
+    // Close Thread
+    pthread_exit(NULL);
+
+    return 0;
 }
 
 
@@ -239,3 +264,4 @@ int str2int(char *str){
     }
     return ret;
 }
+
