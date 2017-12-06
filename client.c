@@ -3,11 +3,13 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <sys/stat.h> // mkdir
 #include <netinet/in.h>
 #include <arpa/inet.h> //For using "inet_addr"
 
 #include <unistd.h>
 #include <fcntl.h>
+#include <libgen.h> // basename
 
 typedef int SOCKET;
 char* IP = "127.0.0.1";
@@ -118,8 +120,13 @@ int main(int argc, char *argv[]){
             char fileName_[100] = "./client_folder/";
             strcat(fileName_,fileName);
 
+            char *dirc = strdup(fileName_);
+            char *dname = dirname(dirc);
+            mkdir(dname, 0755);
+
             // File Open
             FILE *fd = fopen(fileName_, "wb");
+
             int bufferNum, totalBufferNum;
             long readByte, totalReadByte;
             long fileSize;
@@ -140,14 +147,13 @@ int main(int argc, char *argv[]){
                 totalReadByte += readByte;
                 printf("In progress : %ld/%ld Byte(s) [%d%%]\n\n", totalReadByte, fileSize, (bufferNum*100/totalBufferNum));
                 fwrite(buf, sizeof(char), readByte, fd);
-
                 if(readByte == -1){
                     printf("File Receive Error!\n");
                     return -1;
                 }
             } 
+
             fclose(fd);
-           
             // Fin message 
             memset(&send_msg, 0, sizeof(send_msg));
             strcpy(send_msg, "THANK YOU!");
