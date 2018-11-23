@@ -8,6 +8,7 @@
 ## Additional Goals
 - [ ] Connection within different IP Address
 - [ ] Multi-tasking Server using fork()
-- [ ] Multi-plexing Server using select()
-- [x] Multi-thread Server
+- [x] Multi-tasking Server using thread()
+- [x] Multi-plexing echo Server using select()
+- [x] Multi-plexing echo Server using kqueue()
 
